@@ -8,42 +8,57 @@ class VampirKoyluSayfasi extends StatefulWidget {
 }
 
 class _VampirKoyluSayfasiState extends State<VampirKoyluSayfasi> {
-  int oyuncuSayisi = 5;
+  int vampirSayisi = 1;
+  int doktorSayisi = 1;
+  int gozcuSayisi = 1;
+  int koyluSayisi = 2;
+
   List<String> roller = [];
+  List<String> oyuncuIsimleri = [];
   int sira = 0;
   bool rolGoster = false;
+  List<TextEditingController> controllers = [];
 
-  // Role özel renk veren yardımcı fonksiyon
-  Color _rolRengi(String rol) {
-    if (rol.contains("VAMPİR")) return Colors.red;
-    if (rol.contains("DOKTOR")) return Colors.blue;
-    if (rol.contains("GÖZCÜ")) return Colors.purple;
-    return Colors.green; // Köylü için
+  // Rollerin toplam sayısını veren yardımcı değişken
+  int get toplamOyuncu => vampirSayisi + doktorSayisi + gozcuSayisi + koyluSayisi;
+
+  final Map<String, String> rolBilgisi = {
+    "Vampir": "Her gece bir köylüyü eler.",
+    "Doktor": "Her gece birini seçer, vampir onu seçerse ölmez.",
+    "Gözcü": "Her gece birinin rolüne bakma hakkı vardır.",
+    "Köylü": "Gündüzleri vampiri bulmaya çalışır.",
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _controllerlariGuncelle();
   }
 
-  // Role özel talimat veren yardımcı fonksiyon
-  String _rolAciklamasi(String rol) {
-    if (rol.contains("VAMPİR")) return "Her gece bir köylüyü elemek için arkadaşınla fısıldaş.";
-    if (rol.contains("DOKTOR")) return "Her gece birini seç; eğer vampir onu seçerse o kişi ölmez.";
-    if (rol.contains("GÖZCÜ")) return "Her gece birinin kartına gizlice bakma hakkın var.";
-    return "Gündüzleri vampiri bulmaya çalış, geceleri hayatta kal!";
+  // Liste hatasını önleyen güvenli güncelleme fonksiyonu
+  void _controllerlariGuncelle() {
+    setState(() {
+      int mevcutSayi = controllers.length;
+      if (toplamOyuncu > mevcutSayi) {
+        for (int i = mevcutSayi; i < toplamOyuncu; i++) {
+          controllers.add(TextEditingController(text: "Oyuncu ${i + 1}"));
+        }
+      } else if (toplamOyuncu < mevcutSayi) {
+        controllers.removeRange(toplamOyuncu, mevcutSayi);
+      }
+    });
   }
 
   void rolleriHazirla() {
+    oyuncuIsimleri = controllers.map((c) => c.text).toList();
     List<String> yeniRoller = [];
 
-    // Dinamik Rol Dağıtım Mantığı
-    yeniRoller.add("VAMPİR 🧛"); 
-    if (oyuncuSayisi >= 8) yeniRoller.add("VAMPİR 🧛"); // 8+ oyuncuda 2. vampir
-    
-    yeniRoller.add("DOKTOR 🏥");
-    yeniRoller.add("GÖZCÜ 👁️");
+    yeniRoller.addAll(List.generate(vampirSayisi, (index) => "VAMPİR 🧛"));
+    yeniRoller.addAll(List.generate(doktorSayisi, (index) => "DOKTOR 🏥"));
+    yeniRoller.addAll(List.generate(gozcuSayisi, (index) => "GÖZCÜ 👁️"));
+    yeniRoller.addAll(List.generate(koyluSayisi, (index) => "KÖYLÜ 👨‍🌾"));
 
-    while (yeniRoller.length < oyuncuSayisi) {
-      yeniRoller.add("KÖYLÜ 👨‍🌾");
-    }
-
-    yeniRoller.shuffle(); 
+    yeniRoller.shuffle();
     setState(() {
       roller = yeniRoller;
       sira = 0;
@@ -54,42 +69,77 @@ class _VampirKoyluSayfasiState extends State<VampirKoyluSayfasi> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Vampir Köylü - Rol Dağıtımı"),
-        backgroundColor: Colors.redAccent,
-        foregroundColor: Colors.white,
-      ),
-      body: Center(
-        child: roller.isEmpty ? kurulumEkrani() : oyunEkrani(),
-      ),
+      appBar: AppBar(title: const Text("Vampir Köylü Ayarları"), backgroundColor: Colors.redAccent),
+      body: roller.isEmpty ? kurulumEkrani() : oyunEkrani(),
     );
   }
 
   Widget kurulumEkrani() {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.group, size: 80, color: Colors.redAccent),
-          const SizedBox(height: 20),
-          Text("Oyuncu Sayısı: $oyuncuSayisi", 
-               style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
-          Slider(
-            value: oyuncuSayisi.toDouble(),
-            min: 4, max: 15, divisions: 11,
-            activeColor: Colors.redAccent,
-            onChanged: (v) => setState(() => oyuncuSayisi = v.toInt()),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: Colors.amber[100], borderRadius: BorderRadius.circular(10)),
+            child: const Text("💡 İdeal: 5 kişide 1, 8 kişide 2 vampir önerilir.", style: TextStyle(fontStyle: FontStyle.italic)),
           ),
           const SizedBox(height: 20),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              minimumSize: const Size(250, 60),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          _rolAyariRow("Vampir", vampirSayisi, (val) => setState(() => vampirSayisi = val), Colors.red, true),
+          _rolAyariRow("Doktor", doktorSayisi, (val) => setState(() => doktorSayisi = val), Colors.blue, false),
+          _rolAyariRow("Gözcü", gozcuSayisi, (val) => setState(() => gozcuSayisi = val), Colors.purple, false),
+          _rolAyariRow("Köylü", koyluSayisi, (val) => setState(() => koyluSayisi = val), Colors.green, false),
+          const Divider(height: 30),
+          const Text("Oyuncu İsimleri", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          ...List.generate(controllers.length, (index) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: TextField(
+              controller: controllers[index],
+              decoration: InputDecoration(labelText: "${index + 1}. Oyuncu", border: const OutlineInputBorder()),
             ),
-            onPressed: rolleriHazirla, 
-            child: const Text("ROLLERİ DAĞIT", style: TextStyle(color: Colors.white, fontSize: 18)),
+          )),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, minimumSize: const Size(double.infinity, 60)),
+            onPressed: rolleriHazirla,
+            child: const Text("OYUNU BAŞLAT", style: TextStyle(color: Colors.white, fontSize: 18)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _rolAyariRow(String isim, int deger, Function(int) onUpdate, Color renk, bool enAzBir) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(isim, style: TextStyle(fontSize: 18, color: renk, fontWeight: FontWeight.bold)),
+                Text(rolBilgisi[isim]!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.remove_circle_outline), 
+            onPressed: () {
+              if (deger > (enAzBir ? 1 : 0)) {
+                onUpdate(deger - 1);
+                _controllerlariGuncelle();
+              }
+            }
+          ),
+          Text("$deger", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          IconButton(
+            icon: const Icon(Icons.add_circle_outline), 
+            onPressed: () {
+              onUpdate(deger + 1);
+              _controllerlariGuncelle();
+            }
           ),
         ],
       ),
@@ -97,102 +147,43 @@ class _VampirKoyluSayfasiState extends State<VampirKoyluSayfasi> {
   }
 
   Widget oyunEkrani() {
-    // Tüm roller dağıtıldıktan sonra görünen rehber ekranı
     if (sira >= roller.length) {
-      return SingleChildScrollView(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.nights_stay, size: 80, color: Colors.indigo),
-            const SizedBox(height: 20),
-            const Text("Gece Akış Rehberi", style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 40),
-              child: Divider(thickness: 2),
-            ),
-            _rehberAdimi("1. Herkes gözlerini kapatsın."),
-            _rehberAdimi("2. Vampirler birbirini tanısın ve kurbanı seçsin."),
-            _rehberAdimi("3. Doktor uyansın ve koruyacağı kişiyi seçsin."),
-            _rehberAdimi("4. Gözcü uyansın ve birinin rolüne baksın."),
-            _rehberAdimi("5. Herkes uyansın ve sabah olsun!"),
-            const SizedBox(height: 30),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              onPressed: () => setState(() => roller = []), 
-              child: const Text("YENİ OYUN BAŞLAT", style: TextStyle(color: Colors.white)),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      );
+      return Center(child: ElevatedButton(onPressed: () => setState(() => roller = []), child: const Text("Yeni Oyun Kur")));
     }
+    
+    String rolIsmi = roller[sira].split(" ")[0];
+    String aciklama = rolBilgisi[rolIsmi.toLowerCase().contains("vampir") ? "Vampir" : 
+                     rolIsmi.toLowerCase().contains("doktor") ? "Doktor" : 
+                     rolIsmi.toLowerCase().contains("gözcü") ? "Gözcü" : "Köylü"]!;
 
-    // Rollerin tek tek elden ele dağıtıldığı ekran
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text("${sira + 1}. Oyuncu", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-        const Text("Lütfen telefonu eline al", style: TextStyle(fontSize: 18, color: Colors.grey)),
-        const SizedBox(height: 40),
-        Container(
-          width: 280, height: 320,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 15)],
-            border: Border.all(color: rolGoster ? _rolRengi(roller[sira]) : Colors.grey[300]!, width: 3),
-          ),
-          child: rolGoster 
-            ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(roller[sira], 
-                       style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: _rolRengi(roller[sira]))),
-                  const SizedBox(height: 20),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Text(
-                      _rolAciklamasi(roller[sira]),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16, fontStyle: FontStyle.italic, color: Colors.black87),
-                    ),
-                  ),
-                ],
-              )
-            : const Icon(Icons.help_outline, size: 100, color: Colors.grey),
-        ),
-        const SizedBox(height: 40),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.black87,
-            minimumSize: const Size(200, 50),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-          onPressed: () => setState(() => rolGoster = !rolGoster),
-          child: Text(rolGoster ? "GİZLE" : "ROLÜMÜ GÖR", style: const TextStyle(color: Colors.white, fontSize: 18)),
-        ),
-        if (rolGoster)
-          Padding(
-            padding: const EdgeInsets.only(top: 20),
-            child: TextButton.icon(
-              onPressed: () => setState(() { sira++; rolGoster = false; }), 
-              icon: const Icon(Icons.arrow_forward, size: 30, color: Colors.green),
-              label: const Text("SONRAKİ OYUNCU", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-            ),
-          )
-      ],
-    );
-  }
-
-  Widget _rehberAdimi(String metin) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 30),
-      child: Row(
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.double_arrow, color: Colors.indigo, size: 20),
-          const SizedBox(width: 10),
-          Expanded(child: Text(metin, style: const TextStyle(fontSize: 17))),
+          Text(oyuncuIsimleri[sira], style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.redAccent)),
+          const SizedBox(height: 20),
+          Container(
+            width: 300, height: 350,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white, borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: rolGoster ? Colors.redAccent : Colors.grey, width: 4),
+              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
+            ),
+            child: rolGoster 
+              ? Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(roller[sira], style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 20),
+                    Text(aciklama, textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, fontStyle: FontStyle.italic)),
+                  ],
+                )
+              : const Icon(Icons.help_center, size: 100, color: Colors.grey),
+          ),
+          const SizedBox(height: 30),
+          ElevatedButton(onPressed: () => setState(() => rolGoster = !rolGoster), child: Text(rolGoster ? "GİZLE" : "ROLÜMÜ GÖR")),
+          if (rolGoster) IconButton(icon: const Icon(Icons.arrow_circle_right, size: 50, color: Colors.green), onPressed: () => setState(() { sira++; rolGoster = false; })),
         ],
       ),
     );
