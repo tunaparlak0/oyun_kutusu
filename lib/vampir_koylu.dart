@@ -8,26 +8,27 @@ class VampirKoyluSayfasi extends StatefulWidget {
 }
 
 class _VampirKoyluSayfasiState extends State<VampirKoyluSayfasi> {
+  // Ayarlar
   int vampirSayisi = 1;
   int doktorSayisi = 1;
   int gozcuSayisi = 1;
   int koyluSayisi = 2;
 
+  // Oyun Durumu
   List<String> roller = [];
   List<String> oyuncuIsimleri = [];
+  List<bool> hayattaMi = [];
   int sira = 0;
   bool rolGoster = false;
+  bool rolBakildiMi = false;
   List<TextEditingController> controllers = [];
 
-  // Rollerin toplam sayısını veren yardımcı değişken
-  int get toplamOyuncu => vampirSayisi + doktorSayisi + gozcuSayisi + koyluSayisi;
+  // Moderatörsüz Seçimler
+  String? vampirSecimi;
+  String? doktorSecimi;
+  String? gozcuBilgisi;
 
-  final Map<String, String> rolBilgisi = {
-    "Vampir": "Her gece bir köylüyü eler.",
-    "Doktor": "Her gece birini seçer, vampir onu seçerse ölmez.",
-    "Gözcü": "Her gece birinin rolüne bakma hakkı vardır.",
-    "Köylü": "Gündüzleri vampiri bulmaya çalışır.",
-  };
+  int get toplamOyuncu => vampirSayisi + doktorSayisi + gozcuSayisi + koyluSayisi;
 
   @override
   void initState() {
@@ -35,41 +36,42 @@ class _VampirKoyluSayfasiState extends State<VampirKoyluSayfasi> {
     _controllerlariGuncelle();
   }
 
-  // Liste hatasını önleyen güvenli güncelleme fonksiyonu
+  // 1. SORUNUN ÇÖZÜMÜ: Sayı değiştikçe isim listesini anında günceller
   void _controllerlariGuncelle() {
     setState(() {
-      int mevcutSayi = controllers.length;
-      if (toplamOyuncu > mevcutSayi) {
-        for (int i = mevcutSayi; i < toplamOyuncu; i++) {
-          controllers.add(TextEditingController(text: "Oyuncu ${i + 1}"));
+      if (controllers.length < toplamOyuncu) {
+        int eklenecek = toplamOyuncu - controllers.length;
+        for (int i = 0; i < eklenecek; i++) {
+          controllers.add(TextEditingController(text: "Oyuncu ${controllers.length + 1}"));
         }
-      } else if (toplamOyuncu < mevcutSayi) {
-        controllers.removeRange(toplamOyuncu, mevcutSayi);
+      } else if (controllers.length > toplamOyuncu) {
+        controllers.removeRange(toplamOyuncu, controllers.length);
       }
     });
   }
 
   void rolleriHazirla() {
     oyuncuIsimleri = controllers.map((c) => c.text).toList();
+    hayattaMi = List.generate(toplamOyuncu, (index) => true);
     List<String> yeniRoller = [];
-
-    yeniRoller.addAll(List.generate(vampirSayisi, (index) => "VAMPİR 🧛"));
-    yeniRoller.addAll(List.generate(doktorSayisi, (index) => "DOKTOR 🏥"));
-    yeniRoller.addAll(List.generate(gozcuSayisi, (index) => "GÖZCÜ 👁️"));
-    yeniRoller.addAll(List.generate(koyluSayisi, (index) => "KÖYLÜ 👨‍🌾"));
-
+    yeniRoller.addAll(List.generate(vampirSayisi, (i) => "VAMPİR"));
+    yeniRoller.addAll(List.generate(doktorSayisi, (i) => "DOKTOR"));
+    yeniRoller.addAll(List.generate(gozcuSayisi, (i) => "GÖZCÜ"));
+    yeniRoller.addAll(List.generate(koyluSayisi, (i) => "KÖYLÜ"));
     yeniRoller.shuffle();
     setState(() {
       roller = yeniRoller;
       sira = 0;
-      rolGoster = false;
+      vampirSecimi = null;
+      doktorSecimi = null;
+      gozcuBilgisi = null;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Vampir Köylü Ayarları"), backgroundColor: Colors.redAccent),
+      appBar: AppBar(title: const Text("Vampir Köylü (Moderatörsüz)"), backgroundColor: Colors.redAccent),
       body: roller.isEmpty ? kurulumEkrani() : oyunEkrani(),
     );
   }
@@ -78,112 +80,140 @@ class _VampirKoyluSayfasiState extends State<VampirKoyluSayfasi> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: Colors.amber[100], borderRadius: BorderRadius.circular(10)),
-            child: const Text("💡 İdeal: 5 kişide 1, 8 kişide 2 vampir önerilir.", style: TextStyle(fontStyle: FontStyle.italic)),
-          ),
-          const SizedBox(height: 20),
-          _rolAyariRow("Vampir", vampirSayisi, (val) => setState(() => vampirSayisi = val), Colors.red, true),
-          _rolAyariRow("Doktor", doktorSayisi, (val) => setState(() => doktorSayisi = val), Colors.blue, false),
-          _rolAyariRow("Gözcü", gozcuSayisi, (val) => setState(() => gozcuSayisi = val), Colors.purple, false),
-          _rolAyariRow("Köylü", koyluSayisi, (val) => setState(() => koyluSayisi = val), Colors.green, false),
-          const Divider(height: 30),
-          const Text("Oyuncu İsimleri", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          ...List.generate(controllers.length, (index) => Padding(
+          _rolAyar("Vampir", vampirSayisi, (v) => setState(() {vampirSayisi = v; _controllerlariGuncelle();}), true),
+          _rolAyar("Doktor", doktorSayisi, (v) => setState(() {doktorSayisi = v; _controllerlariGuncelle();}), false),
+          _rolAyar("Gözcü", gozcuSayisi, (v) => setState(() {gozcuSayisi = v; _controllerlariGuncelle();}), false),
+          _rolAyar("Köylü", koyluSayisi, (v) => setState(() {koyluSayisi = v; _controllerlariGuncelle();}), false),
+          const Divider(),
+          ...List.generate(controllers.length, (i) => Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
-            child: TextField(
-              controller: controllers[index],
-              decoration: InputDecoration(labelText: "${index + 1}. Oyuncu", border: const OutlineInputBorder()),
-            ),
+            child: TextField(controller: controllers[i], decoration: InputDecoration(labelText: "${i + 1}. Oyuncu")),
           )),
           const SizedBox(height: 20),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, minimumSize: const Size(double.infinity, 60)),
-            onPressed: rolleriHazirla,
-            child: const Text("OYUNU BAŞLAT", style: TextStyle(color: Colors.white, fontSize: 18)),
-          ),
+          ElevatedButton(onPressed: rolleriHazirla, child: const Text("OYUNU BAŞLAT")),
         ],
       ),
     );
   }
 
-  Widget _rolAyariRow(String isim, int deger, Function(int) onUpdate, Color renk, bool enAzBir) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(isim, style: TextStyle(fontSize: 18, color: renk, fontWeight: FontWeight.bold)),
-                Text(rolBilgisi[isim]!, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.remove_circle_outline), 
-            onPressed: () {
-              if (deger > (enAzBir ? 1 : 0)) {
-                onUpdate(deger - 1);
-                _controllerlariGuncelle();
-              }
-            }
-          ),
-          Text("$deger", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline), 
-            onPressed: () {
-              onUpdate(deger + 1);
-              _controllerlariGuncelle();
-            }
-          ),
-        ],
-      ),
-    );
+  Widget _rolAyar(String ad, int deger, Function(int) degis, bool enAz) {
+    return Row(children: [
+      Expanded(child: Text(ad)),
+      IconButton(icon: const Icon(Icons.remove), onPressed: () => deger > (enAz ? 1 : 0) ? degis(deger - 1) : null),
+      Text("$deger"),
+      IconButton(icon: const Icon(Icons.add), onPressed: () => degis(deger + 1)),
+    ]);
   }
 
   Widget oyunEkrani() {
-    if (sira >= roller.length) {
-      return Center(child: ElevatedButton(onPressed: () => setState(() => roller = []), child: const Text("Yeni Oyun Kur")));
+    if (sira < roller.length) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(oyuncuIsimleri[sira], style: const TextStyle(fontSize: 30, color: Colors.red, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            Container(
+              width: 320, height: 380,
+              decoration: BoxDecoration(border: Border.all(color: Colors.red, width: 2), borderRadius: BorderRadius.circular(20)),
+              alignment: Alignment.center,
+              child: rolGoster 
+                ? Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(roller[sira], style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 20),
+                        if (roller[sira] == "VAMPİR") _ozelSecim("Kimi Öldüreceksin?", vampirSecimi, (s) => setState(() => vampirSecimi = s)),
+                        if (roller[sira] == "DOKTOR") _ozelSecim("Kimi Koruyacaksın?", doktorSecimi, (s) => setState(() => doktorSecimi = s)),
+                        if (roller[sira] == "GÖZCÜ") _gozcuSecimi(),
+                      ],
+                    ),
+                )
+                : const Icon(Icons.help, size: 100, color: Colors.grey),
+            ),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              onPressed: () => setState(() {
+                rolGoster = !rolGoster;
+                if (rolGoster) rolBakildiMi = true; // Oyuncu en az bir kez baktı
+              }), 
+              child: Text(rolGoster ? "GİZLE" : "ROLÜ GÖR")
+            ),
+            // DÜZELTME: rolGoster yerine rolBakildiMi kontrolü yapıyoruz
+            if (rolBakildiMi) 
+              Padding(
+                padding: const EdgeInsets.only(top: 20),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_forward, size: 60, color: Colors.green), 
+                  onPressed: () => setState(() { 
+                    sira++; 
+                    rolGoster = false; 
+                    rolBakildiMi = false; // Yeni oyuncu için sıfırlıyoruz
+                    gozcuBilgisi = null; 
+                  }),
+                ),
+              ),
+          ],
+        ),
+      );
     }
-    
-    String rolIsmi = roller[sira].split(" ")[0];
-    String aciklama = rolBilgisi[rolIsmi.toLowerCase().contains("vampir") ? "Vampir" : 
-                     rolIsmi.toLowerCase().contains("doktor") ? "Doktor" : 
-                     rolIsmi.toLowerCase().contains("gözcü") ? "Gözcü" : "Köylü"]!;
+    return geceSonucuEkrani();
+  }
 
+  Widget _ozelSecim(String baslik, String? suankiSecim, Function(String) kaydet) {
+    return Column(
+      children: [
+        Text(baslik),
+        DropdownButton<String>(
+          value: suankiSecim,
+          isExpanded: true,
+          items: oyuncuIsimleri.where((isim) => isim != oyuncuIsimleri[sira]).map((isim) {
+            return DropdownMenuItem(value: isim, child: Text(isim));
+          }).toList(),
+          onChanged: (val) { if (val != null) kaydet(val); },
+          hint: const Text("Seçim Yap"),
+        )
+      ],
+    );
+  }
+
+  Widget _gozcuSecimi() {
+    return Column(
+      children: [
+        const Text("Kimin rolüne bakacaksın?"),
+        DropdownButton<String>(
+          isExpanded: true,
+          items: oyuncuIsimleri.where((isim) => isim != oyuncuIsimleri[sira]).map((isim) {
+            int idx = oyuncuIsimleri.indexOf(isim);
+            return DropdownMenuItem(value: roller[idx], child: Text(isim));
+          }).toList(),
+          onChanged: (val) { if (val != null) setState(() => gozcuBilgisi = val); },
+          hint: const Text("Birini Seç"),
+        ),
+        if (gozcuBilgisi != null) 
+          Text("Rolü: $gozcuBilgisi", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.purple))
+      ],
+    );
+  }
+
+  Widget geceSonucuEkrani() {
+    String sonuc = (vampirSecimi != null && vampirSecimi != doktorSecimi) 
+        ? "$vampirSecimi öldü!" : "Kimse ölmedi!";
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(oyuncuIsimleri[sira], style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.redAccent)),
-          const SizedBox(height: 20),
-          Container(
-            width: 300, height: 350,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.white, borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: rolGoster ? Colors.redAccent : Colors.grey, width: 4),
-              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
-            ),
-            child: rolGoster 
-              ? Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(roller[sira], style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 20),
-                    Text(aciklama, textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, fontStyle: FontStyle.italic)),
-                  ],
-                )
-              : const Icon(Icons.help_center, size: 100, color: Colors.grey),
-          ),
-          const SizedBox(height: 30),
-          ElevatedButton(onPressed: () => setState(() => rolGoster = !rolGoster), child: Text(rolGoster ? "GİZLE" : "ROLÜMÜ GÖR")),
-          if (rolGoster) IconButton(icon: const Icon(Icons.arrow_circle_right, size: 50, color: Colors.green), onPressed: () => setState(() { sira++; rolGoster = false; })),
+          Text(sonuc, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const Divider(),
+          ...List.generate(oyuncuIsimleri.length, (i) => ListTile(
+            leading: Icon(hayattaMi[i] ? Icons.favorite : Icons.heart_broken, color: hayattaMi[i] ? Colors.green : Colors.red),
+            title: Text(oyuncuIsimleri[i]),
+            trailing: Switch(value: hayattaMi[i], onChanged: (v) => setState(() => hayattaMi[i] = v)),
+          )),
+          ElevatedButton(onPressed: () => setState(() => roller = []), child: const Text("Yeni Oyun")),
         ],
       ),
     );
