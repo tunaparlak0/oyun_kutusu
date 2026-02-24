@@ -148,12 +148,34 @@ class _VampirKoyluSayfasiState extends State<VampirKoyluSayfasi> {
                 padding: const EdgeInsets.only(top: 20),
                 child: IconButton(
                   icon: const Icon(Icons.arrow_forward, size: 60, color: Colors.green), 
-                  onPressed: () => setState(() { 
-                    sira++; 
-                    rolGoster = false; 
-                    rolBakildiMi = false; // Yeni oyuncu için sıfırlıyoruz
-                    gozcuBilgisi = null; 
-                  }),
+                  onPressed: () {
+                    // SEÇİM KONTROLÜ
+                    String suankiRol = roller[sira];
+                    bool secimYapildiMi = true;
+
+                    // Eğer rolün bir eylem gerektiriyorsa seçim yapılıp yapılmadığına bakıyoruz
+                    if (suankiRol == "VAMPİR" && vampirSecimi == null) secimYapildiMi = false;
+                    if (suankiRol == "DOKTOR" && doktorSecimi == null) secimYapildiMi = false;
+                    if (suankiRol == "GÖZCÜ" && gozcuBilgisi == null) secimYapildiMi = false;
+
+                    if (secimYapildiMi) {
+                      setState(() { 
+                        sira++; 
+                        rolGoster = false; 
+                        rolBakildiMi = false; 
+                        gozcuBilgisi = null; 
+                      });
+                    } else {
+                      // Seçim yapmayan oyuncuya ekranın altında uyarı gösterir
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text("$suankiRol, lütfen seçimini yapmadan geçme!"),
+                          backgroundColor: Colors.orange,
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  },
                 ),
               ),
           ],
