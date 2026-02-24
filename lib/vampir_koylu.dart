@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math';
 
 class VampirKoyluSayfasi extends StatefulWidget {
   const VampirKoyluSayfasi({super.key});
@@ -24,7 +25,7 @@ class _VampirKoyluSayfasiState extends State<VampirKoyluSayfasi> {
   List<TextEditingController> controllers = [];
 
   // Moderatörsüz Seçimler
-  String? vampirSecimi;
+  List<String> vampirSecimleri = []; // Vampirlerin tüm seçimlerini tutar
   String? doktorSecimi;
   String? gozcuBilgisi;
 
@@ -36,7 +37,6 @@ class _VampirKoyluSayfasiState extends State<VampirKoyluSayfasi> {
     _controllerlariGuncelle();
   }
 
-  // 1. SORUNUN ÇÖZÜMÜ: Sayı değiştikçe isim listesini anında günceller
   void _controllerlariGuncelle() {
     setState(() {
       if (controllers.length < toplamOyuncu) {
@@ -62,9 +62,10 @@ class _VampirKoyluSayfasiState extends State<VampirKoyluSayfasi> {
     setState(() {
       roller = yeniRoller;
       sira = 0;
-      vampirSecimi = null;
+      vampirSecimleri = [];
       doktorSecimi = null;
       gozcuBilgisi = null;
+      rolBakildiMi = false;
     });
   }
 
@@ -108,6 +109,8 @@ class _VampirKoyluSayfasiState extends State<VampirKoyluSayfasi> {
 
   Widget oyunEkrani() {
     if (sira < roller.length) {
+      String suankiRol = roller[sira];
+      
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -115,7 +118,7 @@ class _VampirKoyluSayfasiState extends State<VampirKoyluSayfasi> {
             Text(oyuncuIsimleri[sira], style: const TextStyle(fontSize: 30, color: Colors.red, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
             Container(
-              width: 320, height: 380,
+              width: 320, height: 400,
               decoration: BoxDecoration(border: Border.all(color: Colors.red, width: 2), borderRadius: BorderRadius.circular(20)),
               alignment: Alignment.center,
               child: rolGoster 
@@ -124,11 +127,12 @@ class _VampirKoyluSayfasiState extends State<VampirKoyluSayfasi> {
                   child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(roller[sira], style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 20),
-                        if (roller[sira] == "VAMPİR") _ozelSecim("Kimi Öldüreceksin?", vampirSecimi, (s) => setState(() => vampirSecimi = s)),
-                        if (roller[sira] == "DOKTOR") _ozelSecim("Kimi Koruyacaksın?", doktorSecimi, (s) => setState(() => doktorSecimi = s)),
-                        if (roller[sira] == "GÖZCÜ") _gozcuSecimi(),
+                        Text(suankiRol, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 15),
+                        if (suankiRol == "VAMPİR") _vampirSecimAlani(),
+                        if (suankiRol == "DOKTOR") _ozelSecim("Kimi Koruyacaksın?", doktorSecimi, (s) => setState(() => doktorSecimi = s)),
+                        if (suankiRol == "GÖZCÜ") _gozcuSecimi(),
+                        if (suankiRol == "KÖYLÜ") const Text("Masum köylüsün, hayatta kalmaya çalış!", textAlign: TextAlign.center),
                       ],
                     ),
                 )
@@ -138,27 +142,17 @@ class _VampirKoyluSayfasiState extends State<VampirKoyluSayfasi> {
             ElevatedButton(
               onPressed: () => setState(() {
                 rolGoster = !rolGoster;
-                if (rolGoster) rolBakildiMi = true; // Oyuncu en az bir kez baktı
+                if (rolGoster) rolBakildiMi = true;
               }), 
               child: Text(rolGoster ? "GİZLE" : "ROLÜ GÖR")
             ),
-            // DÜZELTME: rolGoster yerine rolBakildiMi kontrolü yapıyoruz
             if (rolBakildiMi) 
               Padding(
                 padding: const EdgeInsets.only(top: 20),
                 child: IconButton(
                   icon: const Icon(Icons.arrow_forward, size: 60, color: Colors.green), 
                   onPressed: () {
-                    // SEÇİM KONTROLÜ
-                    String suankiRol = roller[sira];
-                    bool secimYapildiMi = true;
-
-                    // Eğer rolün bir eylem gerektiriyorsa seçim yapılıp yapılmadığına bakıyoruz
-                    if (suankiRol == "VAMPİR" && vampirSecimi == null) secimYapildiMi = false;
-                    if (suankiRol == "DOKTOR" && doktorSecimi == null) secimYapildiMi = false;
-                    if (suankiRol == "GÖZCÜ" && gozcuBilgisi == null) secimYapildiMi = false;
-
-                    if (secimYapildiMi) {
+                    if (_secimYapildiMi()) {
                       setState(() { 
                         sira++; 
                         rolGoster = false; 
@@ -166,13 +160,8 @@ class _VampirKoyluSayfasiState extends State<VampirKoyluSayfasi> {
                         gozcuBilgisi = null; 
                       });
                     } else {
-                      // Seçim yapmayan oyuncuya ekranın altında uyarı gösterir
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text("$suankiRol, lütfen seçimini yapmadan geçme!"),
-                          backgroundColor: Colors.orange,
-                          duration: const Duration(seconds: 2),
-                        ),
+                        SnackBar(content: Text("$suankiRol, lütfen seçimini yap!"), backgroundColor: Colors.orange),
                       );
                     }
                   },
@@ -185,10 +174,43 @@ class _VampirKoyluSayfasiState extends State<VampirKoyluSayfasi> {
     return geceSonucuEkrani();
   }
 
+  bool _secimYapildiMi() {
+    String rol = roller[sira];
+    int suanaKadarkiVampirSayisi = roller.sublist(0, sira + 1).where((r) => r == "VAMPİR").length;
+    
+    if (rol == "VAMPİR" && vampirSecimleri.length < suanaKadarkiVampirSayisi) return false;
+    if (rol == "DOKTOR" && doktorSecimi == null) return false;
+    if (rol == "GÖZCÜ" && gozcuBilgisi == null) return false;
+    return true;
+  }
+
+  Widget _vampirSecimAlani() {
+    return Column(
+      children: [
+        if (vampirSecimleri.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text("Yoldaşlarının Seçimleri: ${vampirSecimleri.join(', ')}", 
+              style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
+        _ozelSecim("Kimi Öldüreceksin?", null, (s) {
+          setState(() {
+            int suanaKadarkiVampirSayisi = roller.sublist(0, sira + 1).where((r) => r == "VAMPİR").length;
+            if (vampirSecimleri.length < suanaKadarkiVampirSayisi) {
+              vampirSecimleri.add(s);
+            } else {
+              vampirSecimleri[suanaKadarkiVampirSayisi - 1] = s;
+            }
+          });
+        }),
+      ],
+    );
+  }
+
   Widget _ozelSecim(String baslik, String? suankiSecim, Function(String) kaydet) {
     return Column(
       children: [
-        Text(baslik),
+        Text(baslik, style: const TextStyle(fontWeight: FontWeight.w500)),
         DropdownButton<String>(
           value: suankiSecim,
           isExpanded: true,
@@ -222,20 +244,95 @@ class _VampirKoyluSayfasiState extends State<VampirKoyluSayfasi> {
   }
 
   Widget geceSonucuEkrani() {
-    String sonuc = (vampirSecimi != null && vampirSecimi != doktorSecimi) 
-        ? "$vampirSecimi öldü!" : "Kimse ölmedi!";
+    String? finalVampirSecimi;
+
+    if (vampirSecimleri.isNotEmpty) {
+      // 1. Oyları saymak için Map oluştur
+      Map<String, int> oySayilari = {};
+      for (var isim in vampirSecimleri) {
+        oySayilari[isim] = (oySayilari[isim] ?? 0) + 1;
+      }
+
+      // 2. En yüksek oy sayısını bul
+      int enYuksekOy = 0;
+      oySayilari.forEach((isim, oy) {
+        if (oy > enYuksekOy) enYuksekOy = oy;
+      });
+
+      // 3. En yüksek oyu alanları listele
+      List<String> enCokOyAlanlar = [];
+      oySayilari.forEach((isim, oy) {
+        if (oy == enYuksekOy) enCokOyAlanlar.add(isim);
+      });
+
+      // 4. Eşitlik durumunda rastgele, değilse çoğunluğa göre seç
+      if (enCokOyAlanlar.length == 1) {
+        finalVampirSecimi = enCokOyAlanlar.first;
+      } else {
+        finalVampirSecimi = enCokOyAlanlar[Random().nextInt(enCokOyAlanlar.length)];
+      }
+    }
+
+    // Doktor korumasını kontrol et
+    String sonuc = (finalVampirSecimi != null && finalVampirSecimi != doktorSecimi) 
+        ? "$finalVampirSecimi gece saldırıya uğradı ve öldü!" 
+        : "Bu gece kimse ölmedi!";
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(sonuc, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const Icon(Icons.wb_sunny, size: 80, color: Colors.orange),
+          const SizedBox(height: 10),
+          const Text("SABAH OLDU", style: TextStyle(fontSize: 18, letterSpacing: 2, fontWeight: FontWeight.w300)),
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Text(
+              sonuc, 
+              textAlign: TextAlign.center, 
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.redAccent)
+            ),
+          ),
           const Divider(),
-          ...List.generate(oyuncuIsimleri.length, (i) => ListTile(
-            leading: Icon(hayattaMi[i] ? Icons.favorite : Icons.heart_broken, color: hayattaMi[i] ? Colors.green : Colors.red),
-            title: Text(oyuncuIsimleri[i]),
-            trailing: Switch(value: hayattaMi[i], onChanged: (v) => setState(() => hayattaMi[i] = v)),
-          )),
-          ElevatedButton(onPressed: () => setState(() => roller = []), child: const Text("Yeni Oyun")),
+          const Text("Mezarlık ve Oylama", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          Expanded( // Uzun listelerde taşma olmaması için
+            child: ListView.builder(
+              itemCount: oyuncuIsimleri.length,
+              itemBuilder: (context, i) {
+                return ListTile(
+                  leading: Icon(
+                    hayattaMi[i] ? Icons.favorite : Icons.heart_broken, 
+                    color: hayattaMi[i] ? Colors.green : Colors.red
+                  ),
+                  title: Text(
+                    oyuncuIsimleri[i],
+                    style: TextStyle(
+                      fontSize: 18,
+                      decoration: hayattaMi[i] ? null : TextDecoration.lineThrough,
+                      color: hayattaMi[i] ? Colors.black : Colors.grey,
+                    ),
+                  ),
+                  trailing: Switch(
+                    activeColor: Colors.red,
+                    value: hayattaMi[i], 
+                    onChanged: (v) => setState(() => hayattaMi[i] = v)
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepPurple,
+              minimumSize: const Size(250, 60),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            ),
+            onPressed: () => setState(() => roller = []), 
+            child: const Text("YENİ TUR BAŞLAT", style: TextStyle(color: Colors.white, fontSize: 18))
+          ),
+          const SizedBox(height: 20),
         ],
       ),
     );
